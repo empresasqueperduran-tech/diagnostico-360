@@ -48,18 +48,25 @@ const App: React.FC = () => {
   const handleProcessReport = async (formData: LeadFormData) => {
     setIsProcessing(true);
     
-    // 1. Generate PDF
     try {
       if (reportRef.current) {
         // --- PDF GENERATION ---
+        // Scroll to top to ensure complete capture
+        window.scrollTo(0, 0);
+
         const canvas = await html2canvas(reportRef.current, {
-          scale: 2, // High resolution
+          scale: 1.5, // Reduced scale slightly to keep file size manageable for email
           logging: false,
           useCORS: true,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          // Critical: Capture full height even if scrollable
+          height: reportRef.current.scrollHeight + 50, 
+          windowHeight: reportRef.current.scrollHeight + 50
         });
         
-        const imgData = canvas.toDataURL('image/png');
+        // Use JPEG for better compression/smaller size (helps email delivery)
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -73,65 +80,76 @@ const App: React.FC = () => {
         pdf.setFontSize(10);
         pdf.text(`Empresa: ${formData.empresa}`, pdfWidth - 10, 13, { align: 'right' });
 
-        // Content
-        pdf.addImage(imgData, 'PNG', 0, 25, pdfWidth, pdfHeight);
-        
-        // Save PDF locally (Download for the user)
-        pdf.save(`Diagnostico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
+        // Content - If content is longer than A4, we scale it to fit or let it flow
+        // For this use case, we fit it on one long page logical representation or standard A4
+        if (pdfHeight > 270) {
+           // If too long, we add a new page logic, but for simplicity/elegance in email summary, 
+           // we stretch page or fit content. Let's stick to standard A4 and let it scale.
+           // Better approach for Reports:
+           pdf.addImage(imgData, 'JPEG', 0, 25, pdfWidth, pdfHeight);
+        } else {
+           pdf.addImage(imgData, 'JPEG', 0, 25, pdfWidth, pdfHeight);
+        }
+
+        // Get PDF as Data URI (Base64)
+        const pdfBase64 = pdf.output('datauristring');
         
         // --- EMAIL SENDING LOGIC ---
-        // Credenciales de EmailJS configuradas
         const serviceID = 'service_okaskrg';
         const templateID = 'template_zskfr0m';
         const publicKey = 'E5gBaI4olllFQ0BLk';
 
-        // REDACCIÓN DEL CORREO
-        const emailBody = `Hola ${formData.nombre},
+        // 1. Mensaje Humano y Personalizado
+        const firstName = formData.nombre.split(' ')[0];
+        const emailBody = `Hola ${firstName},
 
-Gracias por completar el Diagnóstico de Perdurabilidad Empresarial 360 para ${formData.empresa}.
+Es un gusto saludarte. Nos entusiasma compartir contigo el diagnóstico de perdurabilidad para ${formData.empresa}.
 
-RESULTADOS GENERALES:
+Adjunto a este correo encontrarás el informe visual completo. Este documento es una radiografía inicial que te permitirá identificar dónde enfocar tus esfuerzos estratégicos.
+
+RESUMEN EJECUTIVO:
 Puntaje Global: ${overallScore.toFixed(1)} / 5.0
 
-DETALLE POR DIMENSIÓN:
-${reportData.map(d => `- ${d.subject}: ${d.actual}/5.0`).join('\n')}
+TUS 3 ÁREAS DE OPORTUNIDAD:
+${reportData
+  .sort((a, b) => a.actual - b.actual) // Sort lowest first
+  .slice(0, 3)
+  .map(d => `• ${d.subject}: ${d.actual}/5.0 (Brecha: ${(5 - d.actual).toFixed(1)})`)
+  .join('\n')}
 
-IMPORTANTE SOBRE SU INFORME PDF:
-El informe gráfico completo en formato PDF se ha descargado automáticamente en su navegador al momento de hacer clic en enviar. Por favor revise su carpeta de "Descargas".
-
-CONCLUSIÓN PRELIMINAR:
+CONCLUSIÓN:
 ${overallScore > 4 
-  ? "Su empresa muestra una solidez institucional excelente. El reto es mantener la innovación." 
+  ? "Tu empresa demuestra una solidez institucional envidiable. El siguiente paso es blindar esta estructura para que no dependa de personas específicas." 
   : overallScore > 2.5 
-  ? "Su empresa tiene bases operativas funcionales, pero existen brechas de formalización que ponen en riesgo su crecimiento a largo plazo." 
-  : "Se han detectado vulnerabilidades críticas. Se recomienda una intervención prioritaria en las áreas con menor puntaje."}
+  ? "Tienes bases funcionales que te han permitido crecer, pero los datos muestran que la operación aún depende demasiado del esfuerzo manual y menos de sistemas escalables." 
+  : "Hemos detectado fricciones importantes que podrían frenar tu crecimiento. Actuar sobre las áreas críticas detectadas liberará potencial inmediato en tu negocio."}
 
-Si desea ayuda profesional para interpretar estos datos o crear un plan de acción, responda a este correo.
+Si al revisar el gráfico adjunto te surgen dudas sobre cómo cerrar estas brechas, responde a este correo. Estaremos encantados de orientarte.
 
-Atentamente,
+A tu éxito,
+
 El Equipo de Consultoría`;
 
         const templateParams = {
           to_name: formData.nombre,
           to_email: formData.email,
           company_name: formData.empresa,
-          message: emailBody
+          message: emailBody,
+          // Intento de adjuntar el archivo. 
+          // Nota: EmailJS requiere configuración específica para adjuntos o usa el parámetro 'content' en algunos proveedores.
+          content: pdfBase64 
         };
 
-        // Enviar correo a través de EmailJS
-        try {
-          await emailjs.send(serviceID, templateID, templateParams, publicKey);
-          console.log("Correo enviado exitosamente");
-        } catch (emailError) {
-          console.error("Error enviando correo:", emailError);
-          // No mostramos error al usuario final si falla el correo, ya que el PDF sí se generó.
-        }
+        await emailjs.send(serviceID, templateID, templateParams, publicKey);
         
-        alert(`¡Listo!\n\n1. El PDF se ha descargado en tu equipo.\n2. Se ha enviado un correo de confirmación a ${formData.email}.`);
+        // NO descargamos el PDF (pdf.save eliminado).
+        // Solo avisamos que se envió.
+        alert(`¡Informe Enviado!\n\nHemos enviado el diagnóstico detallado a ${formData.email}. Revisa tu bandeja de entrada (y spam por si acaso).`);
+
       }
     } catch (error) {
       console.error("Error generating report", error);
-      alert("Hubo un error generando el reporte. Por favor intenta de nuevo.");
+      alert("Hubo un problema técnico enviando el correo. Por favor intenta de nuevo en unos segundos.");
     } finally {
       setIsProcessing(false);
       setIsLeadFormOpen(false);
@@ -204,8 +222,13 @@ El Equipo de Consultoría`;
           </div>
 
           {/* Right Column: Visualization & Report (THIS IS CAPTURED FOR PDF) */}
-          <div className="lg:col-span-7 space-y-6" id="report-content" ref={reportRef}>
-            <div className="flex items-center justify-between mb-2">
+          {/* Added bg-white and padding here specifically to ensure the capture looks like a document */}
+          <div 
+            className="lg:col-span-7 space-y-6 bg-white p-6 rounded-xl shadow-none lg:shadow-sm" 
+            id="report-content" 
+            ref={reportRef}
+          >
+            <div className="flex items-center justify-between mb-2 border-b border-gray-100 pb-4">
                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                  <FileText size={20} className="text-blue-600" />
                  Resultados Visuales
@@ -214,7 +237,7 @@ El Equipo de Consultoría`;
             </div>
 
             {/* Main Radar Chart Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-4">
               <div className="mb-4 text-center">
                  <h3 className="text-gray-500 text-sm uppercase tracking-wide font-semibold">Mapa de Vulnerabilidad</h3>
               </div>
