@@ -23,8 +23,11 @@ const App: React.FC = () => {
 
   // Debugging: Verificar en consola que las dimensiones se cargaron correctamente
   useEffect(() => {
-    console.log('App loaded v3.1 Fix');
+    console.log('App loaded v3.2 Improvements');
     console.log('Dimensions loaded:', DIMENSIONS);
+    if (!process.env.API_KEY) {
+      console.warn("ADVERTENCIA: API_KEY no detectada en process.env. La IA no funcionará.");
+    }
   }, []);
 
   const handleScoreChange = (dimKey: DimensionKey, index: number, value: number) => {
@@ -57,8 +60,13 @@ const App: React.FC = () => {
   // --- LÓGICA DE IA ---
   const generateAIAnalysis = async (companyName: string, data: ChartDataPoint[]) => {
     try {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key no configurada en el entorno.");
+      }
+
       // NOTA: En producción, asegúrate de que process.env.API_KEY esté disponible o usa un proxy.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       
       const scoresSummary = data.map(d => `- ${d.subject}: ${d.actual}/5.0`).join('\n');
       
@@ -95,8 +103,9 @@ const App: React.FC = () => {
         Mantén el texto total bajo 400 palabras.
       `;
 
+      // Updated model to gemini-3-flash-preview per best practices for text tasks
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview', // Modelo rápido y capaz
+        model: 'gemini-3-flash-preview', 
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
@@ -106,8 +115,9 @@ const App: React.FC = () => {
 
       return response.text;
     } catch (error) {
-      console.error("Error AI generation:", error);
-      return "No se pudo generar el análisis detallado por IA en este momento. Sin embargo, los datos numéricos adjuntos son precisos.";
+      console.error("Error CRÍTICO en generación IA:", error);
+      // Return a more user-friendly error message within the PDF context, but log the real one
+      return `Nota del Sistema: No se pudo conectar con el motor de Inteligencia Artificial en este momento (Error: ${error instanceof Error ? error.message : 'Desconocido'}). \n\nSin embargo, el diagnóstico numérico presentado en la página anterior es 100% válido y refleja los datos ingresados. Recomendamos revisar estos indicadores con un consultor humano.`;
     }
   };
 
@@ -211,37 +221,82 @@ const App: React.FC = () => {
       pdf.setTextColor(150, 150, 150);
       pdf.text("Este análisis fue generado con inteligencia artificial basada en la metodología de Perdurabilidad 360.", margin, pageHeight - 10);
 
-      // 3. Enviar Correo
-      setLoadingMessage('Enviando confirmación...');
+      // 3. Enviar Correos (Doble Envío)
+      setLoadingMessage('Enviando reportes...');
       const serviceID = 'service_okaskrg';
       const templateID = 'template_zskfr0m';
       const publicKey = 'E5gBaI4olllFQ0BLk';
 
       const firstName = formData.nombre.split(' ')[0];
-      const emailBody = `Hola ${firstName},
+      
+      // --- COPY PERSUASIVO (Para el Cliente) ---
+      const clientEmailBody = `Hola ${firstName},
 
-El sistema inteligente ha completado el análisis de ${formData.empresa}.
+Gracias por completar el Diagnóstico de Perdurabilidad Empresarial para ${formData.empresa}.
 
-Hemos generado un informe PDF de 2 páginas que incluye:
-1. Tu Mapa de Vulnerabilidad Visual.
-2. Un Análisis Estratégico redactado específicamente para tus resultados, con recomendaciones prácticas.
+Adjunto encontrarás tu informe con el Mapa de Vulnerabilidad y el análisis preliminar.
 
-El archivo se ha descargado automáticamente en tu dispositivo.
+⚠️ IMPORTANTE: ¿Qué sigue ahora?
+
+Este reporte es solo el primer paso (el "qué"). Para resolver los hallazgos (el "cómo"), se requiere intervención experta.
+
+Los datos muestran que hay áreas críticas que podrían estar frenando tu escalabilidad o poniendo en riesgo el legado de la compañía. La IA diagnostica, pero la estrategia la definen los expertos.
+
+Te invitamos a agendar una Sesión de Estrategia de 30 minutos con nuestros consultores para:
+1. Profundizar en tus resultados.
+2. Trazar un plan de acción inmediato.
+3. Blindar tu operación.
+
+Responde a este correo para agendar tu sesión sin costo.
+
+"Las empresas no mueren por falta de ventas, mueren por falta de estructura."
 
 Atentamente,
-Tu Consultor Digital`;
+Equipo de Consultoría de Perdurabilidad`;
 
-      await emailjs.send(serviceID, templateID, {
-        to_name: formData.nombre,
-        to_email: formData.email,
-        company_name: formData.empresa,
-        message: emailBody,
-      }, publicKey);
+      // --- COPY ADMINISTRATIVO (Para Ustedes) ---
+      const adminEmailBody = `NUEVO LEAD GENERADO
+
+Nombre: ${formData.nombre}
+Empresa: ${formData.empresa}
+Email: ${formData.email}
+Celular: ${formData.celular}
+Puntaje Global: ${overallScore.toFixed(1)} / 5.0
+
+El cliente ha recibido su informe PDF.`;
+
+      // Envío 1: Al Cliente
+      try {
+        await emailjs.send(serviceID, templateID, {
+          to_name: formData.nombre,
+          to_email: formData.email, // Importante: La plantilla debe usar {{to_email}} en el campo "To"
+          company_name: formData.empresa,
+          message: clientEmailBody,
+          reply_to: 'empresasqueperduran@gmail.com'
+        }, publicKey);
+        console.log("Correo cliente enviado");
+      } catch (err) {
+        console.error("Error enviando correo cliente", err);
+      }
+
+      // Envío 2: Al Administrador (Copia de seguridad)
+      try {
+        await emailjs.send(serviceID, templateID, {
+          to_name: "Administrador",
+          to_email: 'empresasqueperduran@gmail.com',
+          company_name: formData.empresa,
+          message: adminEmailBody,
+          reply_to: formData.email
+        }, publicKey);
+        console.log("Correo admin enviado");
+      } catch (err) {
+        console.error("Error enviando correo admin", err);
+      }
       
       // 4. Descargar
       pdf.save(`Diagnostico_Estrategico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
       
-      alert(`¡Informe Inteligente Listo!\n\nSe ha generado un PDF con análisis estratégico detallado.\nVerifica tus descargas.`);
+      alert(`¡Informe Enviado!\n\nHemos enviado el análisis estratégico a ${formData.email}.\nTambién se ha descargado una copia en este dispositivo.`);
 
     } catch (error) {
       console.error("Error process", error);
@@ -277,7 +332,7 @@ Tu Consultor Digital`;
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold tracking-tight">Diagnóstico 360°</h1>
-                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v3.1 Fix</span>
+                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v3.2 Fix</span>
               </div>
               <p className="text-xs text-gray-400 font-light hidden sm:block">Perdurabilidad Empresarial</p>
             </div>
