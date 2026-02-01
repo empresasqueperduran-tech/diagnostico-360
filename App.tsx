@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DIMENSIONS, INITIAL_SCORES } from './constants';
 import { ScoreInput } from './components/ScoreInput';
 import { RadarReport } from './components/RadarReport';
@@ -20,6 +20,12 @@ const App: React.FC = () => {
   
   // Usamos una referencia específica solo para el gráfico
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Debugging: Verificar en consola que las dimensiones se cargaron correctamente
+  useEffect(() => {
+    console.log('App loaded v3.1 Fix');
+    console.log('Dimensions loaded:', DIMENSIONS);
+  }, []);
 
   const handleScoreChange = (dimKey: DimensionKey, index: number, value: number) => {
     setScores(prev => ({
@@ -271,7 +277,7 @@ Tu Consultor Digital`;
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold tracking-tight">Diagnóstico 360°</h1>
-                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v2.5 Actualizado</span>
+                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v3.1 Fix</span>
               </div>
               <p className="text-xs text-gray-400 font-light hidden sm:block">Perdurabilidad Empresarial</p>
             </div>
