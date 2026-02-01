@@ -73,7 +73,7 @@ export const DIMENSIONS: DimensionDef[] = [
       { id: 1, text: 'Junta Directiva: ¿Existe una Junta Directiva activa y actualizada?' },
       { id: 2, text: 'Decisiones con Datos: ¿La toma de decisiones se realiza mediante el análisis del negocio en la Junta Directiva (y no por intuición)?' },
       { id: 3, text: 'Roles de Socios: ¿Están definidas las funciones y áreas de cada uno de los socios dentro de la empresa?' },
-      { id: 4, text: 'Reglas del Juego (Protocolo): ¿Existen reglas escritas y acordadas (un Protocolo o Acuerdo) que definan claramente cómo entran los familiares a trabajar, remuneración y resolución de conflictos?' }
+      { id: 4, text: 'Reglas del Juego (Protocolo): ¿Existen reglas y acuerdos escritos que definan cómo entran los familiares a trabajar, cuál será su remuneración y resolución de conflictos?' }
     ]
   },
   {
