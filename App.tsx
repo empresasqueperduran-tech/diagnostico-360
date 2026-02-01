@@ -3,10 +3,9 @@ import { DIMENSIONS, INITIAL_SCORES } from './constants';
 import { ScoreInput } from './components/ScoreInput';
 import { RadarReport } from './components/RadarReport';
 import { AnalysisSection } from './components/AnalysisSection';
-import { EmbedModal } from './components/EmbedModal';
 import { LeadFormModal } from './components/LeadFormModal';
 import { ScoresState, DimensionKey, ChartDataPoint, LeadFormData } from './types';
-import { LayoutDashboard, FileText, Mail, Code } from 'lucide-react';
+import { LayoutDashboard, FileText, Mail } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import emailjs from '@emailjs/browser';
@@ -14,7 +13,6 @@ import emailjs from '@emailjs/browser';
 const App: React.FC = () => {
   const [scores, setScores] = useState<ScoresState>(INITIAL_SCORES);
   const [openSection, setOpenSection] = useState<DimensionKey | null>('finanzas');
-  const [isEmbedOpen, setIsEmbedOpen] = useState(false);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -82,13 +80,12 @@ const App: React.FC = () => {
         pdf.save(`Diagnostico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
         
         // --- EMAIL SENDING LOGIC ---
-        // AQUI DEBES REEMPLAZAR CON TUS DATOS DE EMAILJS
-        const serviceID = 'service_okaskrg';   // Ej: 'service_xyz'
-        const templateID = 'template_zskfr0m'; // Ej: 'template_abc'
-        const publicKey = 'E5gBaI4olllFQ0BLk';   // Ej: 'user_123456'
+        // Credenciales de EmailJS configuradas
+        const serviceID = 'service_okaskrg';
+        const templateID = 'template_zskfr0m';
+        const publicKey = 'E5gBaI4olllFQ0BLk';
 
         // REDACCIÓN DEL CORREO
-        // Este texto es el que llegará al usuario. Los saltos de línea (\n) son importantes.
         const emailBody = `Hola ${formData.nombre},
 
 Gracias por completar el Diagnóstico de Perdurabilidad Empresarial 360 para ${formData.empresa}.
@@ -118,15 +115,16 @@ El Equipo de Consultoría`;
           to_name: formData.nombre,
           to_email: formData.email,
           company_name: formData.empresa,
-          message: emailBody // Aquí inyectamos todo el texto redactado arriba
+          message: emailBody
         };
 
-        if (publicKey !== 'YOUR_PUBLIC_KEY') {
-           await emailjs.send(serviceID, templateID, templateParams, publicKey);
-           console.log("Correo enviado exitosamente");
-        } else {
-           console.log("MODO DEMO: No se envió correo porque faltan las credenciales de EmailJS en App.tsx");
-           console.log("Cuerpo del correo simulado:", emailBody);
+        // Enviar correo a través de EmailJS
+        try {
+          await emailjs.send(serviceID, templateID, templateParams, publicKey);
+          console.log("Correo enviado exitosamente");
+        } catch (emailError) {
+          console.error("Error enviando correo:", emailError);
+          // No mostramos error al usuario final si falla el correo, ya que el PDF sí se generó.
         }
         
         alert(`¡Listo!\n\n1. El PDF se ha descargado en tu equipo.\n2. Se ha enviado un correo de confirmación a ${formData.email}.`);
@@ -142,7 +140,6 @@ El Equipo de Consultoría`;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
-      <EmbedModal isOpen={isEmbedOpen} onClose={() => setIsEmbedOpen(false)} />
       <LeadFormModal 
         isOpen={isLeadFormOpen} 
         onClose={() => setIsLeadFormOpen(false)} 
@@ -169,14 +166,6 @@ El Equipo de Consultoría`;
                   {overallScore.toFixed(1)} / 5.0
                 </span>
              </div>
-            
-            <button 
-              onClick={() => setIsEmbedOpen(true)}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700" 
-              title="Insertar en website"
-            >
-              <Code size={18} />
-            </button>
             
             <button 
               onClick={() => setIsLeadFormOpen(true)}
