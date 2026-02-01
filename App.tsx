@@ -5,16 +5,18 @@ import { RadarReport } from './components/RadarReport';
 import { AnalysisSection } from './components/AnalysisSection';
 import { LeadFormModal } from './components/LeadFormModal';
 import { ScoresState, DimensionKey, ChartDataPoint, LeadFormData } from './types';
-import { LayoutDashboard, FileText, Download } from 'lucide-react';
+import { LayoutDashboard, FileText, Download, Sparkles } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import emailjs from '@emailjs/browser';
+import { GoogleGenAI } from "@google/genai";
 
 const App: React.FC = () => {
   const [scores, setScores] = useState<ScoresState>(INITIAL_SCORES);
   const [openSection, setOpenSection] = useState<DimensionKey | null>('finanzas');
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   
   // Usamos una referencia específica solo para el gráfico
   const chartRef = useRef<HTMLDivElement>(null);
@@ -46,110 +48,165 @@ const App: React.FC = () => {
 
   const overallScore = reportData.reduce((acc, curr) => acc + curr.actual, 0) / reportData.length;
 
+  // --- LÓGICA DE IA ---
+  const generateAIAnalysis = async (companyName: string, data: ChartDataPoint[]) => {
+    try {
+      // NOTA: En producción, asegúrate de que process.env.API_KEY esté disponible o usa un proxy.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      const scoresSummary = data.map(d => `- ${d.subject}: ${d.actual}/5.0`).join('\n');
+      
+      // Prompt con "Metodología Experta" inyectada (Simulación de Base de Conocimiento)
+      const systemInstruction = `
+        Actúa como un Consultor Senior de Estrategia Empresarial especializado en "Perdurabilidad Corporativa".
+        Tu objetivo es analizar los puntajes de un diagnóstico empresarial y redactar un informe ejecutivo directo y contundente.
+        
+        LA METODOLOGÍA DE PERDURABILIDAD:
+        Te basas en el principio de que una empresa perdurable debe equilibrar 3 pilares:
+        1. Eficiencia Operativa (Finanzas, Operaciones, Tecnología).
+        2. Cohesión Cultural (Talento, Gobernanza).
+        3. Adaptabilidad al Mercado (Mercadeo, Riesgos).
+        
+        ESTILO DE REDACCIÓN:
+        - Profesional, corporativo, empático pero firme.
+        - Evita generalidades. Sé específico basado en los puntajes bajos.
+        - Estructura tu respuesta en texto plano con párrafos claros (sin markdown complejo como negritas ** o tablas, ya que esto irá a un PDF simple).
+        - Usa viñetas simples con guiones (-) si es necesario.
+      `;
+
+      const prompt = `
+        Empresa: ${companyName}
+        Puntaje Global: ${overallScore.toFixed(1)}/5.0
+        
+        Puntajes por Dimensión:
+        ${scoresSummary}
+        
+        Tarea:
+        1. Escribe una "Opinión Ejecutiva" de 1 párrafo resumiendo la salud actual de la empresa.
+        2. Identifica las 2 áreas más críticas (puntajes más bajos) y prescribe 3 recomendaciones tácticas concretas para cada una.
+        3. Escribe una conclusión motivadora sobre el potencial de escalabilidad.
+        
+        Mantén el texto total bajo 400 palabras.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview', // Modelo rápido y capaz
+        contents: prompt,
+        config: {
+          systemInstruction: systemInstruction,
+          temperature: 0.7,
+        },
+      });
+
+      return response.text;
+    } catch (error) {
+      console.error("Error AI generation:", error);
+      return "No se pudo generar el análisis detallado por IA en este momento. Sin embargo, los datos numéricos adjuntos son precisos.";
+    }
+  };
+
   const handleProcessReport = async (formData: LeadFormData) => {
     setIsProcessing(true);
+    setLoadingMessage('Analizando datos...');
     
     try {
-      // --- 1. GENERACIÓN DE PDF (Para descarga local) ---
+      // 1. Generar Análisis de IA en paralelo a la preparación visual
+      setLoadingMessage('Consultando a la IA Experta...');
+      const aiAnalysisText = await generateAIAnalysis(formData.empresa, reportData);
+
+      // 2. Generar PDF
+      setLoadingMessage('Generando documento PDF...');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
 
+      // --- PÁGINA 1: VISUAL ---
       // Encabezado
-      pdf.setFillColor(15, 23, 42); // Slate 900
+      pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 0, pageWidth, 25, 'F');
-      
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
       pdf.text('Informe Diagnóstico 360', margin, 17);
-      
       pdf.setFontSize(10);
       pdf.setTextColor(200, 200, 200);
       pdf.text(`Empresa: ${formData.empresa}`, pageWidth - margin, 17, { align: 'right' });
 
-      // Información General
+      // Info
       pdf.setTextColor(40, 40, 40);
       pdf.setFontSize(12);
       pdf.text(`Fecha: ${new Date().toLocaleDateString()}`, margin, 35);
-      pdf.text(`Solicitante: ${formData.nombre}`, margin, 42);
+      pdf.text(`Puntaje Global: ${overallScore.toFixed(1)} / 5.0`, pageWidth - margin, 35, { align: 'right' });
 
-      // Puntaje Global
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(`Puntaje Global: ${overallScore.toFixed(1)} / 5.0`, pageWidth - margin, 42, { align: 'right' });
-
-      // Capturar Gráfico
+      // Gráfico
       let chartImageHeight = 0;
       if (chartRef.current) {
         const chartCanvas = await html2canvas(chartRef.current, {
-          scale: 2, // Mayor calidad para descarga local
+          scale: 2,
           backgroundColor: '#ffffff'
         });
-        const imgData = chartCanvas.toDataURL('image/png'); // PNG para mejor calidad
+        const imgData = chartCanvas.toDataURL('image/png');
         const imgWidth = 140; 
         chartImageHeight = (chartCanvas.height * imgWidth) / chartCanvas.width;
         const x = (pageWidth - imgWidth) / 2;
-        pdf.addImage(imgData, 'PNG', x, 50, imgWidth, chartImageHeight);
+        pdf.addImage(imgData, 'PNG', x, 45, imgWidth, chartImageHeight);
       }
 
-      // Tabla de Resultados
-      let currentY = 50 + chartImageHeight + 15;
-      
+      // Tabla Resumen Pág 1
+      let currentY = 45 + chartImageHeight + 10;
       pdf.setFontSize(14);
-      pdf.setTextColor(23, 37, 84); 
-      pdf.text("Detalle de Dimensiones", margin, currentY);
+      pdf.setTextColor(23, 37, 84);
+      pdf.text("Resumen de Métricas", margin, currentY);
+      currentY += 8;
       
-      currentY += 10;
       pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text("DIMENSIÓN", margin, currentY);
-      pdf.text("PUNTAJE", pageWidth - margin - 40, currentY);
-      pdf.text("BRECHA", pageWidth - margin, currentY, { align: 'right' });
-      
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, currentY + 2, pageWidth - margin, currentY + 2);
-      
-      currentY += 10;
       pdf.setTextColor(0, 0, 0);
-
       reportData.forEach((item) => {
         const gap = 5 - item.actual;
-        pdf.text(item.subject, margin, currentY);
-        
-        if (item.actual < 3) pdf.setTextColor(220, 38, 38); 
-        else pdf.setTextColor(0, 0, 0);
-        
-        pdf.text(`${item.actual.toFixed(1)} / 5.0`, pageWidth - margin - 35, currentY);
-        
-        pdf.setTextColor(100, 100, 100);
-        pdf.text(`-${gap.toFixed(1)}`, pageWidth - margin, currentY, { align: 'right' });
-        
-        pdf.setTextColor(0, 0, 0); 
-        currentY += 8;
+        pdf.text(`${item.subject}`, margin, currentY);
+        pdf.text(`${item.actual.toFixed(1)}`, pageWidth - margin - 20, currentY, { align: 'right' });
+        currentY += 6;
       });
 
-      // Conclusión
-      currentY += 15;
-      pdf.setFillColor(240, 249, 255); 
-      pdf.rect(margin, currentY, pageWidth - (margin * 2), 40, 'F');
+      // --- PÁGINA 2: ANÁLISIS IA ---
+      pdf.addPage();
       
-      pdf.setFontSize(12);
-      pdf.setTextColor(23, 37, 84);
-      pdf.text("Análisis Preliminar", margin + 5, currentY + 10);
+      // Encabezado Pág 2
+      pdf.setFillColor(240, 249, 255); // Fondo azul muy claro para diferenciar
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      pdf.setFontSize(10);
-      pdf.setTextColor(50, 50, 50);
+      pdf.setFillColor(15, 23, 42);
+      pdf.rect(0, 0, pageWidth, 25, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(16);
+      pdf.text('Análisis Estratégico & Recomendaciones', margin, 17);
       
-      let conclusion = "";
-      if (overallScore > 4) conclusion = "Excelente nivel de institucionalización. Enfoque estratégico: Innovación y expansión.";
-      else if (overallScore > 2.5) conclusion = "Operación funcional pero dependiente. Se detectan brechas de formalización que requieren atención para escalar.";
-      else conclusion = "Nivel de vulnerabilidad alto. Se recomienda intervención prioritaria en las áreas marcadas en rojo para asegurar la continuidad.";
+      // Cuerpo del texto IA
+      pdf.setTextColor(20, 20, 20);
+      pdf.setFontSize(11);
       
-      const splitText = pdf.splitTextToSize(conclusion, pageWidth - (margin * 2) - 10);
-      pdf.text(splitText, margin + 5, currentY + 20);
+      const splitAnalysis = pdf.splitTextToSize(aiAnalysisText, pageWidth - (margin * 2));
+      let textY = 40;
+      
+      // Renderizar texto con paginación simple si fuera muy largo (aunque limitamos a 400 palabras)
+      splitAnalysis.forEach((line: string) => {
+        if (textY > pageHeight - margin) {
+          pdf.addPage();
+          pdf.setFillColor(240, 249, 255);
+          pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+          textY = 20;
+        }
+        pdf.text(line, margin, textY);
+        textY += 6;
+      });
 
-      // --- 2. ENVÍO DE CORREO (SOLO DATOS, SIN ADJUNTO) ---
-      // Esto asegura que el correo salga rápido y no falle por peso
+      // Disclaimer IA
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text("Este análisis fue generado con inteligencia artificial basada en la metodología de Perdurabilidad 360.", margin, pageHeight - 10);
+
+      // 3. Enviar Correo
+      setLoadingMessage('Enviando confirmación...');
       const serviceID = 'service_okaskrg';
       const templateID = 'template_zskfr0m';
       const publicKey = 'E5gBaI4olllFQ0BLk';
@@ -157,52 +214,40 @@ const App: React.FC = () => {
       const firstName = formData.nombre.split(' ')[0];
       const emailBody = `Hola ${firstName},
 
-Gracias por utilizar nuestra herramienta de Diagnóstico 360 para ${formData.empresa}.
+El sistema inteligente ha completado el análisis de ${formData.empresa}.
 
-Tus datos han sido registrados correctamente. El informe PDF detallado se ha generado y descargado en tu dispositivo.
+Hemos generado un informe PDF de 2 páginas que incluye:
+1. Tu Mapa de Vulnerabilidad Visual.
+2. Un Análisis Estratégico redactado específicamente para tus resultados, con recomendaciones prácticas.
 
-RESUMEN DE TU DIAGNÓSTICO:
-- Puntaje Global: ${overallScore.toFixed(1)} / 5.0
-- Brecha Principal: ${reportData.sort((a,b) => a.actual - b.actual)[0].subject}
-
-En los próximos días te enviaremos información complementaria para ayudarte a mejorar estos indicadores.
-
-Si deseas agendar una sesión de revisión de estos resultados, responde a este correo.
+El archivo se ha descargado automáticamente en tu dispositivo.
 
 Atentamente,
-Carlos Borjas
-Consultor de Empresas`;
+Tu Consultor Digital`;
 
-      const templateParams = {
+      await emailjs.send(serviceID, templateID, {
         to_name: formData.nombre,
         to_email: formData.email,
         company_name: formData.empresa,
         message: emailBody,
-        // IMPORTANTE: No enviamos 'content' (el PDF) por correo para evitar errores de tamaño.
-        // El usuario lo descarga directamente.
-      };
-
-      // Enviamos el correo en segundo plano
-      await emailjs.send(serviceID, templateID, templateParams, publicKey);
+      }, publicKey);
       
-      // --- 3. DESCARGA DEL PDF ---
-      pdf.save(`Diagnostico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
+      // 4. Descargar
+      pdf.save(`Diagnostico_Estrategico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
       
-      alert(`¡Registro Exitoso!\n\n1. Tu informe PDF se está descargando automáticamente.\n2. Hemos enviado un respaldo de los datos a ${formData.email}.`);
+      alert(`¡Informe Inteligente Listo!\n\nSe ha generado un PDF con análisis estratégico detallado.\nVerifica tus descargas.`);
 
     } catch (error) {
       console.error("Error process", error);
-      // Si falla el correo, al menos aseguramos la descarga del PDF
-      alert("Tu informe se generó correctamente y se descargará ahora.");
-      try {
-         // Reintentar solo descarga si falló algo previo
-         const pdf = new jsPDF('p', 'mm', 'a4');
-         pdf.text("Copia de seguridad del informe", 10, 10);
-         pdf.save("Diagnostico_Respaldo.pdf");
-      } catch(e) {}
+      alert("Hubo un error generando el informe inteligente. Se descargará la versión básica.");
+      // Fallback básico si falla la IA o algo más
+      const pdf = new jsPDF();
+      pdf.text("Informe Básico (Error en IA)", 10, 10);
+      pdf.save("Diagnostico_Basico.pdf");
     } finally {
       setIsProcessing(false);
       setIsLeadFormOpen(false);
+      setLoadingMessage('');
     }
   };
 
@@ -213,6 +258,7 @@ Consultor de Empresas`;
         onClose={() => setIsLeadFormOpen(false)} 
         onSubmit={handleProcessReport}
         isProcessing={isProcessing}
+        loadingMessage={loadingMessage}
       />
       
       {/* Header */}
@@ -237,10 +283,11 @@ Consultor de Empresas`;
             
             <button 
               onClick={() => setIsLeadFormOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-sm shadow-blue-500/30"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 border border-white/10"
             >
-              <Download size={16} />
-              <span className="hidden sm:inline">Descargar Informe PDF</span>
+              <Sparkles size={16} className="text-yellow-300" />
+              <span className="hidden sm:inline">Generar Informe con IA</span>
+              <span className="sm:hidden">Informe IA</span>
             </button>
           </div>
         </div>
