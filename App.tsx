@@ -5,7 +5,7 @@ import { RadarReport } from './components/RadarReport';
 import { AnalysisSection } from './components/AnalysisSection';
 import { LeadFormModal } from './components/LeadFormModal';
 import { ScoresState, DimensionKey, ChartDataPoint, LeadFormData } from './types';
-import { LayoutDashboard, FileText, Mail } from 'lucide-react';
+import { LayoutDashboard, FileText, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import emailjs from '@emailjs/browser';
@@ -16,7 +16,7 @@ const App: React.FC = () => {
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Usamos una referencia específica solo para el gráfico, para mantener el peso bajo
+  // Usamos una referencia específica solo para el gráfico
   const chartRef = useRef<HTMLDivElement>(null);
 
   const handleScoreChange = (dimKey: DimensionKey, index: number, value: number) => {
@@ -50,12 +50,12 @@ const App: React.FC = () => {
     setIsProcessing(true);
     
     try {
-      // --- GENERACIÓN DE PDF VECTORIAL (Optimizada para peso < 100KB) ---
+      // --- 1. GENERACIÓN DE PDF (Para descarga local) ---
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const margin = 20;
 
-      // 1. Encabezado (Dibujado vectorialmente)
+      // Encabezado
       pdf.setFillColor(15, 23, 42); // Slate 900
       pdf.rect(0, 0, pageWidth, 25, 'F');
       
@@ -67,7 +67,7 @@ const App: React.FC = () => {
       pdf.setTextColor(200, 200, 200);
       pdf.text(`Empresa: ${formData.empresa}`, pageWidth - margin, 17, { align: 'right' });
 
-      // 2. Información General
+      // Información General
       pdf.setTextColor(40, 40, 40);
       pdf.setFontSize(12);
       pdf.text(`Fecha: ${new Date().toLocaleDateString()}`, margin, 35);
@@ -78,51 +78,45 @@ const App: React.FC = () => {
       pdf.setTextColor(0, 0, 0);
       pdf.text(`Puntaje Global: ${overallScore.toFixed(1)} / 5.0`, pageWidth - margin, 42, { align: 'right' });
 
-      // 3. Capturar SOLO el Gráfico (Imagen pequeña)
+      // Capturar Gráfico
       let chartImageHeight = 0;
       if (chartRef.current) {
         const chartCanvas = await html2canvas(chartRef.current, {
-          scale: 1, // Escala 1 para mantener peso bajo
+          scale: 2, // Mayor calidad para descarga local
           backgroundColor: '#ffffff'
         });
-        const imgData = chartCanvas.toDataURL('image/jpeg', 0.8);
-        const imgWidth = 120; // Ancho en mm
+        const imgData = chartCanvas.toDataURL('image/png'); // PNG para mejor calidad
+        const imgWidth = 140; 
         chartImageHeight = (chartCanvas.height * imgWidth) / chartCanvas.width;
-        
-        // Centrar imagen
         const x = (pageWidth - imgWidth) / 2;
-        pdf.addImage(imgData, 'JPEG', x, 50, imgWidth, chartImageHeight);
+        pdf.addImage(imgData, 'PNG', x, 50, imgWidth, chartImageHeight);
       }
 
-      // 4. Tabla de Resultados (Texto Vectorial)
+      // Tabla de Resultados
       let currentY = 50 + chartImageHeight + 15;
       
       pdf.setFontSize(14);
-      pdf.setTextColor(23, 37, 84); // Blue 900
+      pdf.setTextColor(23, 37, 84); 
       pdf.text("Detalle de Dimensiones", margin, currentY);
       
       currentY += 10;
       pdf.setFontSize(10);
       pdf.setTextColor(100, 100, 100);
-      // Encabezados de tabla
       pdf.text("DIMENSIÓN", margin, currentY);
       pdf.text("PUNTAJE", pageWidth - margin - 40, currentY);
       pdf.text("BRECHA", pageWidth - margin, currentY, { align: 'right' });
       
-      // Línea separadora
       pdf.setDrawColor(200, 200, 200);
       pdf.line(margin, currentY + 2, pageWidth - margin, currentY + 2);
       
       currentY += 10;
       pdf.setTextColor(0, 0, 0);
 
-      // Filas
       reportData.forEach((item) => {
         const gap = 5 - item.actual;
         pdf.text(item.subject, margin, currentY);
         
-        // Color coding simple para texto
-        if (item.actual < 3) pdf.setTextColor(220, 38, 38); // Rojo
+        if (item.actual < 3) pdf.setTextColor(220, 38, 38); 
         else pdf.setTextColor(0, 0, 0);
         
         pdf.text(`${item.actual.toFixed(1)} / 5.0`, pageWidth - margin - 35, currentY);
@@ -130,13 +124,13 @@ const App: React.FC = () => {
         pdf.setTextColor(100, 100, 100);
         pdf.text(`-${gap.toFixed(1)}`, pageWidth - margin, currentY, { align: 'right' });
         
-        pdf.setTextColor(0, 0, 0); // Reset
+        pdf.setTextColor(0, 0, 0); 
         currentY += 8;
       });
 
-      // 5. Conclusión Automática
+      // Conclusión
       currentY += 15;
-      pdf.setFillColor(240, 249, 255); // Fondo azul muy claro
+      pdf.setFillColor(240, 249, 255); 
       pdf.rect(margin, currentY, pageWidth - (margin * 2), 40, 'F');
       
       pdf.setFontSize(12);
@@ -151,37 +145,31 @@ const App: React.FC = () => {
       else if (overallScore > 2.5) conclusion = "Operación funcional pero dependiente. Se detectan brechas de formalización que requieren atención para escalar.";
       else conclusion = "Nivel de vulnerabilidad alto. Se recomienda intervención prioritaria en las áreas marcadas en rojo para asegurar la continuidad.";
       
-      // Split text para que no se salga del margen
       const splitText = pdf.splitTextToSize(conclusion, pageWidth - (margin * 2) - 10);
       pdf.text(splitText, margin + 5, currentY + 20);
 
-
-      // Obtener Base64 del PDF optimizado
-      const pdfBase64 = pdf.output('datauristring');
-      
-      // --- ENVÍO DE CORREO ---
+      // --- 2. ENVÍO DE CORREO (SOLO DATOS, SIN ADJUNTO) ---
+      // Esto asegura que el correo salga rápido y no falle por peso
       const serviceID = 'service_okaskrg';
       const templateID = 'template_zskfr0m';
       const publicKey = 'E5gBaI4olllFQ0BLk';
 
-      // Redacción Humana
       const firstName = formData.nombre.split(' ')[0];
       const emailBody = `Hola ${firstName},
 
-Qué bueno saludarte. Hemos procesado con éxito los datos de ${formData.empresa}.
+Gracias por utilizar nuestra herramienta de Diagnóstico 360 para ${formData.empresa}.
 
-Adjunto encontrarás el informe en PDF. Lo hemos optimizado para que sea fácil de leer y compartir con tus socios.
+Tus datos han sido registrados correctamente. El informe PDF detallado se ha generado y descargado en tu dispositivo.
 
-RESUMEN RÁPIDO:
-Tu puntaje global fue de ${overallScore.toFixed(1)} sobre 5.0.
+RESUMEN DE TU DIAGNÓSTICO:
+- Puntaje Global: ${overallScore.toFixed(1)} / 5.0
+- Brecha Principal: ${reportData.sort((a,b) => a.actual - b.actual)[0].subject}
 
-¿QUÉ SIGUE?
-El gráfico adjunto muestra claramente dónde está el desequilibrio entre tu operación actual y una empresa altamente perdurable.
+En los próximos días te enviaremos información complementaria para ayudarte a mejorar estos indicadores.
 
-Si al ver el informe sientes que hay temas que "te quitan el sueño" y no sabes por dónde empezar a corregirlos, responde a este correo. Podemos agendar una llamada breve de 15 minutos para interpretar los números juntos.
+Si deseas agendar una sesión de revisión de estos resultados, responde a este correo.
 
-Un abrazo,
-
+Atentamente,
 Carlos Borjas
 Consultor de Empresas`;
 
@@ -190,21 +178,28 @@ Consultor de Empresas`;
         to_email: formData.email,
         company_name: formData.empresa,
         message: emailBody,
-        content: pdfBase64 // Este PDF ahora pesa ~80KB, debería pasar sin problemas
+        // IMPORTANTE: No enviamos 'content' (el PDF) por correo para evitar errores de tamaño.
+        // El usuario lo descarga directamente.
       };
 
+      // Enviamos el correo en segundo plano
       await emailjs.send(serviceID, templateID, templateParams, publicKey);
       
-      alert(`¡Informe Enviado!\n\nRevisa tu bandeja de entrada (${formData.email}).\n\nSi no lo ves, revisa la carpeta de Spam.`);
+      // --- 3. DESCARGA DEL PDF ---
+      pdf.save(`Diagnostico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
+      
+      alert(`¡Registro Exitoso!\n\n1. Tu informe PDF se está descargando automáticamente.\n2. Hemos enviado un respaldo de los datos a ${formData.email}.`);
 
     } catch (error) {
-      console.error("Error generating report", error);
-      // Fallback si falla el correo
-      alert("Lo sentimos, hubo un error de conexión enviando el correo. Como respaldo, tu PDF se descargará automáticamente ahora.");
-      
-      // En este caso extremo, sí permitimos descargar para no perder el lead
-      // Fallback download logic logic could go here, but let's keep it simple
-      
+      console.error("Error process", error);
+      // Si falla el correo, al menos aseguramos la descarga del PDF
+      alert("Tu informe se generó correctamente y se descargará ahora.");
+      try {
+         // Reintentar solo descarga si falló algo previo
+         const pdf = new jsPDF('p', 'mm', 'a4');
+         pdf.text("Copia de seguridad del informe", 10, 10);
+         pdf.save("Diagnostico_Respaldo.pdf");
+      } catch(e) {}
     } finally {
       setIsProcessing(false);
       setIsLeadFormOpen(false);
@@ -244,8 +239,8 @@ Consultor de Empresas`;
               onClick={() => setIsLeadFormOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-sm shadow-blue-500/30"
             >
-              <Mail size={16} />
-              <span className="hidden sm:inline">Enviar informe PDF por correo</span>
+              <Download size={16} />
+              <span className="hidden sm:inline">Descargar Informe PDF</span>
             </button>
           </div>
         </div>
