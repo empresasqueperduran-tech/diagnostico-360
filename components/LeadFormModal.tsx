@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Loader2 } from 'lucide-react';
+import { X, Mail, Loader2, Download } from 'lucide-react';
 import { LeadFormData } from '../types';
 
 interface LeadFormModalProps {
@@ -38,11 +38,11 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, o
         <div className="bg-slate-900 p-6 text-white flex justify-between items-start">
           <div>
             <h3 className="text-xl font-bold flex items-center gap-2">
-              <Mail size={20} className="text-blue-400" />
-              Recibir Informe
+              <Download size={20} className="text-blue-400" />
+              Descargar Informe
             </h3>
-            <p className="text-slate-300 text-sm mt-1">
-              Completa tus datos para enviarte el diagnóstico detallado.
+            <p className="text-slate-300 text-sm mt-1 leading-relaxed">
+              Completa tus datos para <strong>descargar el PDF</strong> inmediatamente. También te enviaremos un análisis complementario a tu correo.
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -125,17 +125,17 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, o
               {isProcessing ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
-                  Enviando...
+                  Procesando...
                 </>
               ) : (
                 <>
-                  <Mail size={20} />
-                  Enviar informe PDF por correo
+                  <Download size={20} />
+                  Descargar Informe y Registrarse
                 </>
               )}
             </button>
             <p className="text-center text-xs text-gray-400 mt-3">
-              Tus datos están seguros y se usarán solo para enviarte el diagnóstico.
+              Sus datos son confidenciales. Al descargar acepta recibir información de análisis.
             </p>
           </div>
         </form>
