@@ -12,79 +12,79 @@ import { DimensionDef, ScoresState, DimensionKey } from './types';
 export const DIMENSIONS: DimensionDef[] = [
   {
     key: 'finanzas',
-    label: 'Finanzas',
+    label: 'Finanzas (Solidez)',
     icon: Banknote,
     questions: [
-      { id: 1, text: 'Conocimiento y Plan: ¿Cuenta la gerencia con conocimientos financieros sólidos y un plan presupuestario anual documentado?' },
-      { id: 2, text: 'Rentabilidad Real: ¿El monitoreo del flujo de caja demuestra consistentemente que los ingresos superan a los gastos operativos y financieros?' },
-      { id: 3, text: 'Reservas y Contingencia: ¿Existen indicadores claros que activen el uso de provisiones o reservas para garantizar la continuidad ante una crisis?' },
-      { id: 4, text: 'Estrategia: ¿Existe una planificación estratégica financiera actualizada alineada con los objetivos de largo plazo?' }
+      { id: 1, text: 'Conocimiento y Plan: ¿Existen conocimientos financieros en la gerencia y un plan financiero documentado y actualizado?' },
+      { id: 2, text: 'Estrategia de Flujo: ¿Se cuenta con la identificación de las estrategias a seguir según el monitoreo del flujo de caja en tiempo real (ingresos vs. gastos)?' },
+      { id: 3, text: 'Reservas: ¿Se cuenta con indicadores claros que permitan, en caso de contingencia, activar el uso de provisiones o reservas para la continuidad del negocio?' },
+      { id: 4, text: 'Estrategia Global: ¿Se cuenta con la correspondiente planificación estratégica de la empresa actualizada?' }
     ]
   },
   {
     key: 'operaciones',
-    label: 'Operaciones',
+    label: 'Operaciones (Eficiencia)',
     icon: Settings,
     questions: [
-      { id: 1, text: 'Cadena de Valor: ¿Es la cadena de valor eficiente y fluida desde la solicitud del cliente hasta la entrega final (sin cuellos de botella)?' },
-      { id: 2, text: 'Infraestructura: ¿Las herramientas, equipos y espacios actuales soportarían un aumento del 30% en la demanda?' },
-      { id: 3, text: 'Procesos Operativos: ¿Están documentados los procesos críticos de la operación (el "cómo se hace") para no depender de una sola persona?' },
-      { id: 4, text: 'Medición: ¿Se cumplen los tiempos de entrega prometidos al cliente de forma consistente?' }
+      { id: 1, text: 'Cadena de Valor: ¿La cadena de valor es eficiente desde su inicio hasta su culminación?' },
+      { id: 2, text: 'Procesos Críticos: ¿Se cuenta con los procesos críticos del área de operaciones definidos y documentados?' },
+      { id: 3, text: 'Infraestructura: ¿La infraestructura actual permite cumplir los tiempos y resultados prometidos sin colapsar ante un aumento de demanda?' },
+      { id: 4, text: 'Sistematización: ¿Los procesos operativos funcionan sin depender exclusivamente del "saber hacer" de una sola persona?' }
     ]
   },
   {
     key: 'riesgos',
-    label: 'Riesgos',
+    label: 'Riesgos (Blindaje)',
     icon: ShieldAlert,
     questions: [
-      { id: 1, text: 'Mapa de Riesgos: ¿Están identificados los riesgos que podrían detener el negocio mañana (legales, operativos, mercado)?' },
-      { id: 2, text: 'Mitigación: ¿Se revisan estos riesgos periódicamente en comités formales?' },
-      { id: 3, text: 'Legalidad: ¿La empresa cumple con toda la normativa legal/fiscal para evitar multas que afecten el patrimonio?' },
-      { id: 4, text: 'Procesos de Riesgo: ¿Existen protocolos de actuación definidos en caso de que un riesgo se materialice?' }
+      { id: 1, text: 'Categorización: ¿Se tienen identificados y categorizados los riesgos (Estratégicos, Operativos, Financieros)?' },
+      { id: 2, text: 'Mitigación: ¿Se cuenta con estrategias definidas para la mitigación de los riesgos detectados?' },
+      { id: 3, text: 'Seguimiento: ¿Se realizan seguimientos periódicos a los riesgos mediante comités?' },
+      { id: 4, text: 'Origen: ¿Se conoce con detalle el origen de los riesgos que afectan la operación?' }
     ]
   },
   {
     key: 'talento',
-    label: 'Talento',
+    label: 'Talento (Cultura y Sucesión)',
     icon: Users,
     questions: [
-      { id: 1, text: 'Sucesión/Continuidad: ¿Existe un plan definido para la sucesión del liderazgo o para el cambio de accionistas (sea empresa familiar o no)?' },
-      { id: 2, text: 'Clima Laboral: ¿Se ejecutan planes periódicos para medir el clima organizacional y la satisfacción del equipo?' },
-      { id: 3, text: 'Competencias: ¿El personal clave ocupa su cargo por mérito y capacidad demostrada?' },
-      { id: 4, text: 'Procesos de RRHH: ¿Están definidos los procesos de captación, evaluación y desarrollo del personal?' }
+      { id: 1, text: 'Sucesión/Continuidad: ¿En caso de ser empresa familiar existe un plan de sucesión definido, o en caso de no serlo, un plan para el cambio de accionistas/liderazgo?' },
+      { id: 2, text: 'Clima Laboral: ¿La empresa ejecuta planes de medición del clima laboral?' },
+      { id: 3, text: 'Procesos de RRHH: ¿Se cuenta con los procesos críticos de Talento Humano definidos (selección, evaluación, capacitación)?' },
+      { id: 4, text: 'Competencias: ¿Se realizan evaluaciones de competencias y planes de cierre de brechas para el personal clave?' }
     ]
   },
   {
     key: 'mercadeo',
-    label: 'Mercadeo',
+    label: 'Mercadeo (Posicionamiento)',
     icon: Megaphone,
     questions: [
-      { id: 1, text: 'Posicionamiento: ¿Está claramente definido el perfil del cliente ideal y el nicho de mercado?' },
-      { id: 2, text: 'Efectividad: ¿Las acciones de mercadeo traen clientes nuevos de forma recurrente (no solo referidos)?' },
-      { id: 3, text: 'ROI: ¿Se mide el retorno de la inversión de las campañas publicitarias?' },
-      { id: 4, text: 'Procesos Comerciales: ¿Está definido y sistematizado el proceso de ventas y atención al cliente?' }
+      { id: 1, text: 'Efectividad: ¿El mercadeo está siendo efectivo y se utilizan los canales correctos?' },
+      { id: 2, text: 'Procesos de Mercadeo: ¿Se cuenta con los procesos críticos de Mercadeo definidos?' },
+      { id: 3, text: 'Segmentación: ¿Se tienen identificados los nichos de mercado y los clientes están segmentados?' },
+      { id: 4, text: 'Captación: ¿El cliente nuevo es captado generalmente por las acciones de mercadeo (no solo por referidos)?' }
     ]
   },
   {
     key: 'gobernanza',
-    label: 'Gobernanza',
+    label: 'Gobernanza (Institucionalización)',
     icon: Gavel,
     questions: [
-      { id: 1, text: 'Junta Directiva: ¿Existe una Junta Directiva (o Comité de Dirección) activa y actualizada que analice el negocio periódicamente?' },
-      { id: 2, text: 'Toma de Decisiones: ¿Las decisiones estratégicas se toman en la Junta basándose en análisis de datos, no solo en la intuición?' },
-      { id: 3, text: 'Roles de Socios: ¿Están claramente definidas y separadas las funciones de los socios de las funciones de los empleados/ejecutivos?' },
-      { id: 4, text: 'Reglas de Juego: ¿Existen acuerdos formales (Protocolo Familiar o Acuerdo de Accionistas) que regulen la relación futura entre los dueños?' }
+      { id: 1, text: 'Junta Directiva: ¿Existe una Junta Directiva activa y actualizada?' },
+      { id: 2, text: 'Decisiones con Datos: ¿La toma de decisiones se realiza mediante el análisis del negocio en la Junta Directiva (y no por intuición)?' },
+      { id: 3, text: 'Roles de Socios: ¿Están definidas las funciones y áreas de cada uno de los socios dentro de la empresa?' },
+      { id: 4, text: 'Reglas del Juego (Protocolo): ¿Existen reglas escritas y acordadas (un Protocolo o Acuerdo) que definan claramente cómo entran los familiares a trabajar, remuneración y resolución de conflictos?' }
     ]
   },
   {
     key: 'tecnologia',
-    label: 'Tecnología',
+    label: 'Tecnología (Transformación)',
     icon: Cpu,
     questions: [
-      { id: 1, text: 'Herramientas: ¿El software y hardware actual facilita el trabajo o lo entorpece?' },
-      { id: 2, text: 'Datos: ¿La tecnología permite obtener datos confiables para la toma de decisiones en tiempo real?' },
-      { id: 3, text: 'Seguridad: ¿Está protegida la información crítica del negocio (backups, ciberseguridad)?' },
-      { id: 4, text: 'Procesos TI: ¿Se utiliza la tecnología para automatizar tareas manuales repetitivas?' }
+      { id: 1, text: 'Herramientas: ¿La empresa cuenta con las herramientas y equipos tecnológicos requeridos?' },
+      { id: 2, text: 'Procesos TI: ¿Se cuenta con los procesos críticos tecnológicos definidos?' },
+      { id: 3, text: 'Calidad de Data: ¿La data generada es útil y se cuenta con sistemas de información seguros?' },
+      { id: 4, text: 'Automatización: ¿Se han automatizado procesos manuales mediante la tecnología?' }
     ]
   }
 ];

@@ -353,7 +353,7 @@ Tu Consultor Digital`;
             <AnalysisSection data={reportData} />
             
             <div className="text-center text-xs text-gray-400 mt-8 pt-4 border-t border-gray-200">
-              <p>Diagnóstico de Perdurabilidad Empresarial 360 - {new Date().getFullYear()}</p>
+              <p>Diagnóstico de Perdurabilidad Empresarial 360 - {new Date().getFullYear()} (Actualizado)</p>
             </div>
 
           </div>
