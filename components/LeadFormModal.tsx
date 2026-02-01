@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Loader2, Download } from 'lucide-react';
+import { X, Loader2, Sparkles } from 'lucide-react';
 import { LeadFormData } from '../types';
 
 interface LeadFormModalProps {
@@ -7,9 +7,10 @@ interface LeadFormModalProps {
   onClose: () => void;
   onSubmit: (data: LeadFormData) => Promise<void>;
   isProcessing: boolean;
+  loadingMessage?: string;
 }
 
-export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, onSubmit, isProcessing }) => {
+export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, onSubmit, isProcessing, loadingMessage }) => {
   const [formData, setFormData] = useState<LeadFormData>({
     nombre: '',
     empresa: '',
@@ -35,14 +36,14 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, o
         className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-slate-900 p-6 text-white flex justify-between items-start">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-white flex justify-between items-start">
           <div>
             <h3 className="text-xl font-bold flex items-center gap-2">
-              <Download size={20} className="text-blue-400" />
-              Descargar Informe
+              <Sparkles size={20} className="text-yellow-400" />
+              Informe Inteligente
             </h3>
             <p className="text-slate-300 text-sm mt-1 leading-relaxed">
-              Completa tus datos para <strong>descargar el PDF</strong> inmediatamente. También te enviaremos un análisis complementario a tu correo.
+              Obtén un <strong>diagnóstico estratégico generado por IA</strong>. Completa tus datos para procesar el análisis.
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -120,22 +121,22 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({ isOpen, onClose, o
             <button 
               type="submit" 
               disabled={isProcessing}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isProcessing ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
-                  Procesando...
+                  {loadingMessage || 'Generando Informe con IA...'}
                 </>
               ) : (
                 <>
-                  <Download size={20} />
-                  Descargar Informe y Registrarse
+                  <Sparkles size={20} className="text-yellow-200" />
+                  Generar Informe Completo
                 </>
               )}
             </button>
             <p className="text-center text-xs text-gray-400 mt-3">
-              Sus datos son confidenciales. Al descargar acepta recibir información de análisis.
+              Usamos IA para analizar tus datos. El informe puede tardar unos segundos.
             </p>
           </div>
         </form>
