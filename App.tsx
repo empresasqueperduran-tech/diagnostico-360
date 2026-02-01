@@ -269,7 +269,10 @@ Tu Consultor Digital`;
               <LayoutDashboard size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Diagnóstico 360°</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold tracking-tight">Diagnóstico 360°</h1>
+                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v2.5 Actualizado</span>
+              </div>
               <p className="text-xs text-gray-400 font-light hidden sm:block">Perdurabilidad Empresarial</p>
             </div>
           </div>
