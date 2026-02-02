@@ -5,7 +5,7 @@ import { RadarReport } from './components/RadarReport';
 import { AnalysisSection } from './components/AnalysisSection';
 import { LeadFormModal } from './components/LeadFormModal';
 import { ScoresState, DimensionKey, ChartDataPoint, LeadFormData } from './types';
-import { LayoutDashboard, FileText, Sparkles, ArrowRight, CheckCircle, Info, PlayCircle } from 'lucide-react';
+import { LayoutDashboard, FileText, Sparkles, CheckCircle, Info, PlayCircle, Loader2, UserCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import emailjs from '@emailjs/browser';
@@ -27,11 +27,16 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   
+  // Estados para la post-generación (Contacto Consultor)
+  const [lastFormData, setLastFormData] = useState<LeadFormData | null>(null);
+  const [isContacting, setIsContacting] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+  
   // Referencia para capturar el gráfico
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log('App loaded v3.3 Flow Update');
+    console.log('App loaded v4.0 Fixed EmailJS Config');
     if (!process.env.API_KEY) {
       console.warn("ADVERTENCIA: API_KEY no detectada.");
     }
@@ -65,25 +70,50 @@ const App: React.FC = () => {
   const overallScore = reportData.reduce((acc, curr) => acc + curr.actual, 0) / reportData.length;
 
   // --- LÓGICA DE IA ---
-  const generateAIAnalysis = async (companyName: string, data: ChartDataPoint[]) => {
+  const generateAIAnalysis = async (formData: LeadFormData, data: ChartDataPoint[]) => {
     try {
       const apiKey = process.env.API_KEY;
       if (!apiKey) return "Análisis no disponible (Falta API Key).";
 
+      const nameParts = formData.nombre.trim().split(' ');
+      const lastName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : formData.nombre;
+
       const ai = new GoogleGenAI({ apiKey });
       const scoresSummary = data.map(d => `- ${d.subject}: ${d.actual}/5.0`).join('\n');
       
-      const systemInstruction = `Actúa como Consultor Senior en Perdurabilidad Empresarial. Breve, directo y estratégico.`;
+      const systemInstruction = `Actúa como un Consultor Senior experto en Estrategia y Perdurabilidad Empresarial. 
+      
+      Tu objetivo es analizar los resultados de un diagnóstico empresarial y hablarle directamente al cliente (dueño o gerente) usando la segunda persona ("su empresa", "usted", "sus resultados", "su organización").
+      
+      Reglas de Estilo:
+      1. Tono: Profesional, empático, orientado al futuro. Evita el lenguaje técnico excesivo.
+      2. Personalización: Usa frases como "Aunque su organización ha invertido en...", "Su base operativa presenta...". Haz que el cliente sienta que le hablas a él.
+      3. Extensión: Sé detallado y explicativo (mínimo 2 párrafos por sección). Justifica tus observaciones.
+      4. Enfoque: Si hay puntajes bajos en Riesgos o Gobernanza, menciona el concepto de "Fragilidad Estructural".`;
       
       const prompt = `
-        Empresa: ${companyName}. Global: ${overallScore.toFixed(1)}/5.0.
-        Puntajes: ${scoresSummary}.
+        Analiza el siguiente diagnóstico de la empresa "${formData.empresa}".
+        Puntaje Global: ${overallScore.toFixed(1)} / 5.0.
         
-        Redacta:
-        1. Opinión Ejecutiva (1 párrafo).
-        2. 2 Áreas Críticas con 3 recomendaciones c/u.
-        3. Conclusión motivadora.
-        Máximo 400 palabras. Texto plano.
+        Desglose de áreas:
+        ${scoresSummary}
+        
+        Genera el contenido del informe con la siguiente estructura estricta (usa texto plano, párrafos bien redactados):
+
+        ENCABEZADO:
+        "Estimado ${formData.titulo} ${lastName},"
+
+        1. Opinión Ejecutiva: (Mínimo 150 palabras). Un análisis profundo de la situación actual. Conecta las fortalezas con las debilidades. Explica qué significan estos números para la perdurabilidad del negocio a mediano plazo.
+        
+        2. Áreas Críticas (Identifica las 2 más bajas): Para cada una, explica claramente el riesgo de no atenderla y da 3 recomendaciones estratégicas y tácticas.
+        
+        3. Conclusión: Un mensaje final inspirador sobre la importancia de la institucionalización para dejar de ser una empresa reactiva y pasar a ser una empresa perdurable.
+
+        FIRMA (Copia esto exactamente al final):
+        Equipo de Consultoría Estratégica
+        Empresas que Perduran
+        www.empresasqueperduran.com
+        +1 (305) 564-5805
       `;
 
       const response = await ai.models.generateContent({
@@ -95,17 +125,18 @@ const App: React.FC = () => {
       return response.text;
     } catch (error) {
       console.error("Error IA:", error);
-      return "No se pudo conectar con la IA. Los datos numéricos son válidos.";
+      return "No se pudo conectar con la IA para generar el análisis narrativo. Sin embargo, los datos numéricos son válidos y precisos.";
     }
   };
 
   const handleProcessReport = async (formData: LeadFormData) => {
     setIsProcessing(true);
     setLoadingMessage('Analizando datos...');
+    setLastFormData(formData);
     
     try {
       setLoadingMessage('Consultando a la IA Experta...');
-      const aiAnalysisText = await generateAIAnalysis(formData.empresa, reportData);
+      const aiAnalysisText = await generateAIAnalysis(formData, reportData);
 
       setLoadingMessage('Generando PDF...');
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -113,7 +144,7 @@ const App: React.FC = () => {
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
 
-      // Generación del PDF (Simplificada para brevedad, misma lógica visual)
+      // Generación del PDF
       pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 0, pageWidth, 25, 'F');
       pdf.setTextColor(255, 255, 255);
@@ -168,44 +199,102 @@ const App: React.FC = () => {
 
       // Enviar Correos
       setLoadingMessage('Enviando reportes...');
-      const serviceID = 'service_okaskrg';
-      const templateID = 'template_zskfr0m';
-      const publicKey = 'E5gBaI4olllFQ0BLk';
+      
+      // --- ACTUALIZADO SEGÚN CAPTURA DE PANTALLA ---
+      const serviceID = 'service_okaskrg'; 
+      // El ID de la captura es 'f7f6xho'. Usualmente llevan prefijo 'template_'.
+      const templateID = 'template_f7f6xho'; 
+      const publicKey = 'E5gBaI4olllFQ0BLk'; 
 
-      const clientBody = `Hola ${formData.nombre.split(' ')[0]},\n\nGracias por realizar el Diagnóstico para ${formData.empresa}.\n\nAdjunto encontrarás el informe. Los datos indican áreas que requieren atención experta para garantizar la perdurabilidad.\n\nTe invitamos a agendar una sesión estratégica respondiendo a este correo.\n\nAtentamente,\nEquipo de Perdurabilidad.`;
+      // IMPORTANTE: En el Dashboard de EmailJS, cambia el campo "To Email" a: {{to_email}}
+      // Si dejas el correo fijo que sale en la foto, el cliente NUNCA recibirá el mail.
 
-      const adminBody = `NUEVO LEAD:\nNombre: ${formData.nombre}\nEmpresa: ${formData.empresa}\nEmail: ${formData.email}\nCelular: ${formData.celular}\nPuntaje: ${overallScore.toFixed(1)}`;
+      const clientBody = `Hola ${formData.titulo} ${formData.nombre.split(' ')[0]},\n\nGracias por realizar el Diagnóstico para ${formData.empresa}.\n\nAdjunto encontrarás el informe detallado generado por nuestra IA especializada.\n\nAtentamente,\nEquipo de Perdurabilidad.`;
+
+      const adminBody = `NUEVO LEAD (Diagnóstico Completado):\nNombre: ${formData.titulo} ${formData.nombre}\nEmpresa: ${formData.empresa}\nEmail: ${formData.email}\nCelular: ${formData.celular}\nPuntaje Global: ${overallScore.toFixed(1)}`;
 
       await Promise.all([
+        // Correo al Cliente
         emailjs.send(serviceID, templateID, {
-          to_name: formData.nombre,
-          to_email: formData.email,
-          company_name: formData.empresa,
-          message: clientBody,
-          reply_to: 'empresasqueperduran@gmail.com'
-        }, publicKey).catch(e => console.error("Client email failed", e)),
+          to_email: formData.email,      // Variable {{to_email}} requerida en Dashboard
+          name: formData.nombre,         // Coincide con {{name}} en Dashboard
+          email: formData.email,         // Coincide con {{email}} en Dashboard (Reply To)
+          message: clientBody,           // Coincide con {{message}} en Dashboard
+          company_name: formData.empresa
+        }, publicKey)
+        .then((res) => console.log("Email cliente enviado. Status:", res.status))
+        .catch(e => console.error("FALLÓ Email Cliente.", e)),
 
+        // Correo al Admin (Copia)
         emailjs.send(serviceID, templateID, {
-          to_name: "Admin",
-          to_email: 'empresasqueperduran@gmail.com',
-          company_name: formData.empresa,
-          message: adminBody,
-          reply_to: formData.email
-        }, publicKey).catch(e => console.error("Admin email failed", e))
+          to_email: 'empresasqueperduran@gmail.com', // Variable {{to_email}} requerida en Dashboard
+          name: "Sistema de Alertas",    // Coincide con {{name}}
+          email: formData.email,         // Para que al responder le llegue al cliente
+          message: adminBody,            // Coincide con {{message}}
+          company_name: formData.empresa
+        }, publicKey)
+        .then((res) => console.log("Email admin enviado. Status:", res.status))
+        .catch(e => console.error("FALLÓ Email Admin.", e))
       ]);
       
       pdf.save(`Diagnostico_${formData.empresa.replace(/\s+/g, '_')}.pdf`);
-      
-      // CAMBIO DE ESTADO: Ir a pantalla de éxito
       setCurrentView('success');
 
     } catch (error) {
-      console.error("Error", error);
-      alert("Error generando el informe. Intente nuevamente.");
+      console.error("Error general:", error);
+      alert("Ocurrió un error en el proceso. Por favor verifica la consola para más detalles.");
     } finally {
       setIsProcessing(false);
       setIsLeadFormOpen(false);
       setLoadingMessage('');
+    }
+  };
+
+  // --- Solicitar Contacto Consultor ---
+  const handleContactRequest = async () => {
+    if (!lastFormData) return;
+    setIsContacting(true);
+
+    const serviceID = 'service_okaskrg';
+    const templateID = 'template_f7f6xho'; // Actualizado ID
+    const publicKey = 'E5gBaI4olllFQ0BLk';
+
+    const emailSubject = `LEAD: ${lastFormData.nombre} - ${lastFormData.empresa}`;
+
+    const messageBody = `SOLICITUD DE PROPUESTA PERSONALIZADA\n` +
+      `--------------------------------------\n` +
+      `El cliente (${lastFormData.titulo} ${lastFormData.nombre}) ha solicitado ser contactado por un consultor especializado.\n\n` +
+      `DETALLES DEL CLIENTE:\n` +
+      `Nombre: ${lastFormData.nombre}\n` +
+      `Empresa: ${lastFormData.empresa}\n` +
+      `Email: ${lastFormData.email}\n` +
+      `Celular: ${lastFormData.celular}\n` +
+      `Sitio Web: ${lastFormData.website || 'No registrado'}\n\n` +
+      `RESUMEN DEL DIAGNÓSTICO:\n` +
+      `Puntaje Global: ${overallScore.toFixed(1)} / 5.0\n` +
+      `Finanzas: ${reportData.find(d => d.subject.includes('Finanzas'))?.actual}\n` +
+      `Operaciones: ${reportData.find(d => d.subject.includes('Operaciones'))?.actual}\n` +
+      `Riesgos: ${reportData.find(d => d.subject.includes('Riesgos'))?.actual}\n` +
+      `Talento: ${reportData.find(d => d.subject.includes('Talento'))?.actual}\n` +
+      `Mercadeo: ${reportData.find(d => d.subject.includes('Mercadeo'))?.actual}\n` +
+      `Gobernanza: ${reportData.find(d => d.subject.includes('Gobernanza'))?.actual}\n` +
+      `Tecnología: ${reportData.find(d => d.subject.includes('Tecnología'))?.actual}`;
+
+    try {
+      await emailjs.send(serviceID, templateID, {
+        to_email: 'empresasqueperduran@gmail.com', // Enviar al consultor
+        name: lastFormData.nombre,
+        email: lastFormData.email,
+        message: `${emailSubject}\n\n${messageBody}`,
+        company_name: lastFormData.empresa
+      }, publicKey);
+      
+      setContactSuccess(true);
+    } catch (error) {
+      console.error("Error enviando solicitud de contacto (EmailJS)", error);
+      alert("Hubo un error al enviar la solicitud. Verifique la consola (F12) para detalles de EmailJS.");
+    } finally {
+      setIsContacting(false);
     }
   };
 
@@ -259,8 +348,8 @@ const App: React.FC = () => {
   // --- VISTA 3: ÉXITO ---
   if (currentView === 'success') {
     return (
-      <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4 text-center">
-        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-green-100">
+      <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-500">
+        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl p-8 sm:p-12 border border-green-100">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="text-green-600 w-10 h-10" />
           </div>
@@ -268,18 +357,57 @@ const App: React.FC = () => {
             ¡Informe Generado con Éxito!
           </h2>
           <p className="text-gray-600 mb-8 leading-relaxed">
-            Gracias por confiar en nuestro diagnóstico. Hemos enviado el <strong>análisis estratégico detallado</strong> a su correo electrónico y se ha descargado una copia en su dispositivo.
+            Hemos enviado el <strong>análisis estratégico detallado</strong> a su correo electrónico y se ha descargado una copia en su dispositivo.
           </p>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 text-left mb-8">
-            <h3 className="font-bold text-blue-900 text-sm mb-1">¿Qué sigue ahora?</h3>
-            <p className="text-blue-800 text-sm">
-              Revise las recomendaciones de la IA. Si desea profundizar en cómo implementar estos cambios, responda a nuestro correo para agendar una sesión estratégica.
+          
+          <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 text-left mb-8 shadow-sm">
+            <h3 className="font-bold text-blue-900 text-lg mb-2 flex items-center gap-2">
+              <Info size={20} />
+              ¿Qué sigue ahora?
+            </h3>
+            <p className="text-blue-800 text-base mb-6 leading-relaxed">
+              Revise las recomendaciones de este informe personalizado.
             </p>
+            
+            <p className="text-gray-600 text-sm mb-4 italic border-l-4 border-blue-300 pl-3">
+              "Haga click aquí si desea que le contacte un consultor especializado, quien diseñará una propuesta personalizada, adaptada a su situación particular, sin compromiso."
+            </p>
+
+            {!contactSuccess ? (
+              <button 
+                onClick={handleContactRequest}
+                disabled={isContacting}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md shadow-blue-200 flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                {isContacting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Enviando solicitud...
+                  </>
+                ) : (
+                  <>
+                    <UserCheck size={18} />
+                    Solicitar Consultoría Personalizada
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="bg-green-100 border border-green-200 text-green-800 p-4 rounded-lg text-sm flex items-start gap-3 animate-in fade-in">
+                <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">¡Solicitud Enviada!</span>
+                  Un consultor analizará su caso y le contactará pronto.
+                </div>
+              </div>
+            )}
           </div>
+
           <button 
             onClick={() => {
               setScores(INITIAL_SCORES);
               setOpenSection(null);
+              setContactSuccess(false);
+              setLastFormData(null);
               setCurrentView('welcome');
             }}
             className="text-gray-500 hover:text-gray-900 font-medium text-sm underline underline-offset-4"
@@ -312,7 +440,7 @@ const App: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold tracking-tight">Diagnóstico 360°</h1>
-                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v3.3</span>
+                <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-500/30">v4.0</span>
               </div>
             </div>
           </div>
@@ -348,7 +476,7 @@ const App: React.FC = () => {
               <span className="text-sm text-gray-500">7 Dimensiones</span>
             </div>
 
-            {/* INSTRUCCIONES CLARAS (Estilo Niño) */}
+            {/* INSTRUCCIONES */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
               <h3 className="text-blue-900 font-bold text-sm flex items-center gap-2 mb-2">
                 <Info size={16} />
